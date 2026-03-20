@@ -16,4 +16,4 @@ execute: |
 
   # Verify that bind9 is listening on port 53
   nsenter --target $(docker inspect -f '{{.State.Pid}}' bind9-rock) --net ss -lnu -o '( sport = 53 )' | grep -q UNCONN
-  nsenter --target $(docker inspect -f '{{.State.Pid}}' bind9-rock) --net ss -lnu -o '( sport = 53 )' | grep -q LISTEN
+  nsenter --target $(docker inspect -f '{{.State.Pid}}' bind9-rock) --net ss -lnt -o '( sport = 53 )' | grep -q LISTEN
