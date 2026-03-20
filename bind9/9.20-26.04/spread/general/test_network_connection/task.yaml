@@ -1,0 +1,29 @@
+summary: Test bind9 is reachable from other container in network
+
+execute: |
+
+  # Cleanup on exit
+  trap "docker stop bind9-rock bind9-client >/dev/null 2>&1 || true" EXIT
+
+  # Create docker network for communication between containers
+  docker network create test-network >/dev/null 2>&1 || true
+
+  # Start the bind9 container
+  docker run --rm -d --name bind9-rock \
+    -v "$(pwd)/db.test.local:/etc/bind/db.test.local:ro" \
+    -v "$(pwd)/named.conf.options:/etc/bind/named.conf.options:ro" \
+    --network test-network bind9:9.20-26.04
+
+  # Wait for the container to be ready
+  until docker exec bind9-rock rndc status >/dev/null 2>&1; do
+    echo "Waiting for bind9 to be ready..."
+    sleep 1
+  done
+
+  # Add a new zone with rndc addzone
+  docker exec bind9-rock rndc addzone test.local '{ type master; file "/etc/bind/db.test.local"; };'
+
+  # Spin up a client container with bind9-dnsutils to test connectivity
+  docker run --rm --name bind9-client --network test-network ubuntu:26.04 \
+    bash -c "apt -qy update && apt -qy install bind9-dnsutils && dig @bind9-rock www.test.local" |
+    grep -q ";; ANSWER SECTION:"
