@@ -58,7 +58,7 @@ jobs:
       rock-repo-commit: ${{ github.head_ref || github.ref_name }}
       rockfile-directory: ${{ matrix.directory }}
       oci-archive-name: ${{ matrix.artifact-name }}
-      arch-map: ${{ needs.prepare.outputs.arch-map }}
+      arch-map: ${{ needs.prepare.outputs.arch-map || null }}
       rockcraft-test: ${{ matrix.run-tests }}
       pro-services: ${{ matrix.pro-services }}
     secrets:
