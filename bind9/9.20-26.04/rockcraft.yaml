@@ -10,6 +10,7 @@ description: |
 base: bare
 # TODO change to 26.04 once 26.04 is officially released
 build-base: devel
+run-user: _daemon_
 
 platforms:
   amd64:
@@ -20,12 +21,15 @@ platforms:
 services:
   dns-server:
     override: replace
-    command: /usr/local/bin/start-bind9.sh
+    command: /usr/sbin/named [ -g ]
     startup: enabled
 
-environment:
-  BIND9_USER: bind
-  USE_CONFIG_FILE_LOGGING: "false"
+checks:
+  config:
+    override: replace
+    exec:
+      command: /usr/bin/named-checkconf
+      service-context: dns-server
 
 parts: 
   bind9:
@@ -39,8 +43,7 @@ parts:
             base-files_chisel \
             base-files_release-info \
             base-passwd_data \
-            bind9_bins \
-            bind9-utils_bins \
+            bind9_core \
             tzdata_zoneinfo
     # TODO Once https://github.com/canonical/chisel-releases/pull/963/changes
     # is merged, we can uncomment the stage-packages and remove the override-build
@@ -49,45 +52,26 @@ parts:
     #   - base-files_chisel
     #   - base-files_release-info
     #   - base-passwd_data
-    #   - bind9_bins
-    #   - bind9-utils_bins
+    #   - bind9_core
     #   - tzdata_zoneinfo
     override-prime: |
         craftctl default
 
-        # Create rndc key
-        mkdir -p ${CRAFT_PRIME}/dev && touch ${CRAFT_PRIME}/dev/null
-        chroot ${CRAFT_PRIME} rndc-confgen -a
-        rm -rf ${CRAFT_PRIME}/dev
-
         # Create bind user and group
         groupadd --root ${CRAFT_PRIME} -g 9970 bind
-        useradd --root ${CRAFT_PRIME} -d /var/cache/bind -g bind -u 9970 bind
+        useradd --root ${CRAFT_PRIME} -d /var/cache/bind -g bind -u 9970 bind -s /usr/sbin/nologin
 
-        # Set permissions for bind user and group
-        chown 9970:9970 ${CRAFT_PRIME}/etc/bind/rndc.key
+        # Add _daemon_ to the bind group by editing the /etc/group file
+        sed -i 's/^bind:x:9970:/bind:x:9970:_daemon_/' ${CRAFT_PRIME}/etc/group
+
+        # Set permissions for bind user and group       
         chgrp 9970 ${CRAFT_PRIME}/etc/bind
-        chmod g+s ${CRAFT_PRIME}/etc/bind
-        chgrp 9970 ${CRAFT_PRIME}/etc/bind/rndc.key ${CRAFT_PRIME}/var/cache/bind
+        chgrp 9970 ${CRAFT_PRIME}/var/cache/bind
         chgrp 9970 ${CRAFT_PRIME}/etc/bind/named.conf*
-        chmod g+r ${CRAFT_PRIME}/etc/bind/rndc.key ${CRAFT_PRIME}/etc/bind/named.conf*
+        
+        chmod g+rws ${CRAFT_PRIME}/etc/bind
         chmod g+rwx ${CRAFT_PRIME}/var/cache/bind
-
-  start-script:
-    plugin: dump
-    source: .
-    source-type: local
-    stage-packages:
-      - dash_bins
-    organize: 
-      'start-bind9.sh': usr/local/bin/start-bind9.sh
-    stage:
-      - usr
-    override-prime: |
-      craftctl default
-
-      # Set execute permissions on the start script
-      chmod +x ${CRAFT_PRIME}/usr/local/bin/start-bind9.sh
+        chmod g+r ${CRAFT_PRIME}/etc/bind/named.conf*
 
   deb-security-manifest:
     plugin: make
