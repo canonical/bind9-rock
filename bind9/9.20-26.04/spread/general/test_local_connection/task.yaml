@@ -1,0 +1,23 @@
+summary: Test bind9 listens on port 53
+
+execute: |
+
+  # Cleanup on exit
+  trap "docker stop bind9-rock >/dev/null 2>&1 || true" EXIT
+
+  # Start the bind9 container
+  docker run --rm -d --name bind9-rock bind9:9.20-26.04
+
+  # Use the rdnc-confgen utility to generate a rndc key
+  docker exec bind9-rock rndc-confgen -a
+  docker restart bind9-rock
+
+  # Wait for the container to be ready
+  until docker exec bind9-rock rndc status >/dev/null 2>&1; do
+    echo "Waiting for bind9 to be ready..."
+    sleep 1
+  done
+
+  # Verify that bind9 is listening on port 53
+  nsenter --target $(docker inspect -f '{{.State.Pid}}' bind9-rock) --net ss -lnu -o '( sport = 53 )' | grep -q UNCONN
+  nsenter --target $(docker inspect -f '{{.State.Pid}}' bind9-rock) --net ss -lnt -o '( sport = 53 )' | grep -q LISTEN
