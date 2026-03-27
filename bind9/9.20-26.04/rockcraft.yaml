@@ -34,26 +34,13 @@ checks:
 parts: 
   bind9:
     plugin: nil
-    source-type: git
-    source-branch: 26.04/bind9
-    source: https://github.com/alesancor1/chisel-releases.git
-    override-build: |
-        chisel cut --release ./ --ignore=unstable --root ${CRAFT_PART_INSTALL} \
-            base-files_base \
-            base-files_chisel \
-            base-files_release-info \
-            base-passwd_data \
-            bind9_core \
-            tzdata_zoneinfo
-    # TODO Once https://github.com/canonical/chisel-releases/pull/963/changes
-    # is merged, we can uncomment the stage-packages and remove the override-build
-    # stage-packages:
-    #   - base-files_base
-    #   - base-files_chisel
-    #   - base-files_release-info
-    #   - base-passwd_data
-    #   - bind9_core
-    #   - tzdata_zoneinfo
+    stage-packages:
+      - base-files_base
+      - base-files_chisel
+      - base-files_release-info
+      - base-passwd_data
+      - bind9_core
+      - tzdata_zoneinfo
     override-prime: |
         craftctl default
 
