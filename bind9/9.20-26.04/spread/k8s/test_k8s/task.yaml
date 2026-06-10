@@ -1,0 +1,36 @@
+summary: bind9 microk8s test
+
+execute: |
+
+  # Generate a persistent rndc key outside the hardened container image.
+  # The key is stored in a Kubernetes Secret and mounted by the deployment.
+  secret="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+  cat > rndc.key <<EOF
+  key "rndc-key" {
+    algorithm hmac-sha256;
+    secret "${secret}";
+  };
+  EOF
+  microk8s kubectl create secret generic bind9-rndc-key \
+    --from-file=rndc.key \
+    --dry-run=client -o yaml | microk8s kubectl apply -f -
+
+  # Apply the deployment to create the bind9 pod
+  microk8s kubectl apply -f deployment.yaml
+  microk8s kubectl rollout status deploy/bind9-deployment --timeout=120s
+
+  # Wait for rndc to be ready after restart.
+  until microk8s kubectl exec deploy/bind9-deployment -- rndc status >/dev/null 2>&1; do
+    echo "Waiting for bind9 to be ready..."
+    sleep 1
+  done
+
+  # Verify the Service exposes DNS on 5353 for both TCP and UDP.
+  svc_ports="$(microk8s kubectl get svc bind9-service -o jsonpath='{range .spec.ports[*]}{.port}/{.protocol}{"\n"}{end}' | sort)"
+  echo "$svc_ports" | grep -qx '5353/TCP'
+  echo "$svc_ports" | grep -qx '5353/UDP'
+
+  # Verify Endpoints map to pod DNS port 53 for both TCP and UDP.
+  ep_ports="$(microk8s kubectl get endpoints bind9-service -o jsonpath='{range .subsets[*].ports[*]}{.port}/{.protocol}{"\n"}{end}' | sort)"
+  echo "$ep_ports" | grep -qx '53/TCP'
+  echo "$ep_ports" | grep -qx '53/UDP'
