@@ -54,6 +54,11 @@ suites:
       k8s bootstrap
       k8s status --wait-ready
 
+      # status --wait-ready returns before cilium finishes programming the coredns
+      # backends, so a pod resolving dns in that ~35s window gets EPERM ("couldn't
+      # get address"). wait for kube-system to actually settle before the tests.
+      k8s kubectl wait --for=condition=Ready pods --all --namespace kube-system --timeout=5m
+
       # Copy the built image to the local registry
       /snap/k8s/current/bin/ctr --address /run/containerd/containerd.sock -n k8s.io \
         images import --base-name docker.io/library/bind9 $CRAFT_ARTIFACT
