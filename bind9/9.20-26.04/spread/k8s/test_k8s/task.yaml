@@ -15,15 +15,15 @@ execute: |
   k8s kubectl apply -f deployment.yaml
   k8s kubectl rollout status deploy/bind9-deployment --timeout=120s
 
-  # Create rndc config and restart bind9 to pick up the new config.
-  k8s kubectl exec deploy/bind9-deployment -- rndc-confgen -a
-  k8s kubectl exec deploy/bind9-deployment -- pebble restart dns-server
-
-  # Wait for rndc to be ready after restart.
+  # Wait for rndc to be ready.
   until k8s kubectl exec deploy/bind9-deployment -- rndc status >/dev/null 2>&1; do
     echo "Waiting for bind9 to be ready..."
     sleep 1
   done
+
+  # Verify the bind9 pod can resolve via coredns
+  k8s kubectl exec deploy/bind9-deployment -- rndc \
+    -s bind9-headless.default.svc.cluster.local status
 
   # Verify the Service exposes DNS on 5353 for both TCP and UDP.
   svc_ports="$(k8s kubectl get svc bind9-service -o jsonpath='{range .spec.ports[*]}{.port}/{.protocol}{"\n"}{end}' | sort)"
