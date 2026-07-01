@@ -3,7 +3,7 @@ summary: Test bind9 is reachable from other container in network
 execute: |
 
   # Cleanup on exit
-  trap "docker stop bind9-rock bind9-client >/dev/null 2>&1 || true" EXIT
+  trap "docker rm -f bind9-rock bind9-client >/dev/null 2>&1 || true" EXIT
 
   # Create docker network for communication between containers
   docker network create test-network >/dev/null 2>&1 || true
