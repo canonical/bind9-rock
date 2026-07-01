@@ -3,7 +3,7 @@ summary: Test bind9 listens on port 53
 execute: |
 
   # Cleanup on exit
-  trap "docker stop bind9-rock >/dev/null 2>&1 || true" EXIT
+  trap "docker rm -f bind9-rock >/dev/null 2>&1 || true" EXIT
 
   # Start the bind9 container
   docker run --rm -d --name bind9-rock bind9:9.20-26.04

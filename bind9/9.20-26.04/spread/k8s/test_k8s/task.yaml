@@ -1,0 +1,41 @@
+summary: bind9 k8s test
+
+execute: |
+
+  # Cilium (CNI) is not yet supported on s390x and ppc64le
+  # so we'll skip the k8s tests on those architectures for now
+  # ---
+  # TODO: Remove this check once Cilium supports s390x and ppc64le
+  if [ "$(uname -m)" = "s390x" ] || [ "$(uname -m)" = "ppc64le" ]; then
+    echo "Skipping k8s tests on $(uname -m) architecture"
+    exit 0
+  fi
+
+  # Apply the deployment to create the bind9 pod
+  k8s kubectl apply -f deployment.yaml
+  k8s kubectl rollout status deploy/bind9-deployment --timeout=120s
+
+  # Apply the test-only dns-probe resources: a second bind9 pod with its rndc
+  # control channel opened + a headless Service (see probe.yaml).
+  k8s kubectl apply -f probe.yaml
+  k8s kubectl rollout status deploy/bind9-probe --timeout=120s
+
+  # Wait for rndc to be ready on the probe pod.
+  until k8s kubectl exec deploy/bind9-probe -- rndc status >/dev/null 2>&1; do
+    echo "Waiting for bind9 to be ready..."
+    sleep 1
+  done
+
+  # Verify the probe pod can resolve via coredns.
+  k8s kubectl exec deploy/bind9-probe -- rndc \
+    -s bind9-probe-headless.default.svc.cluster.local status
+
+  # Verify the Service exposes DNS on 5353 for both TCP and UDP.
+  svc_ports="$(k8s kubectl get svc bind9-service -o jsonpath='{range .spec.ports[*]}{.port}/{.protocol}{"\n"}{end}' | sort)"
+  echo "$svc_ports" | grep -qx '5353/TCP'
+  echo "$svc_ports" | grep -qx '5353/UDP'
+
+  # Verify Endpoints map to pod DNS port 53 for both TCP and UDP.
+  ep_ports="$(k8s kubectl get endpoints bind9-service -o jsonpath='{range .subsets[*].ports[*]}{.port}/{.protocol}{"\n"}{end}' | sort)"
+  echo "$ep_ports" | grep -qx '53/TCP'
+  echo "$ep_ports" | grep -qx '53/UDP'

@@ -1,0 +1,81 @@
+# Test-only resources for the cluster-dns probe (kept out of deployment.yaml so
+# that stays a clean deployment example). A second bind9 pod with its rndc control
+# channel opened on 0.0.0.0 + a fixed key, and a headless Service so the name
+# resolves to the pod IP -- lets `rndc -s <name> status` actually succeed (exit 0)
+# once dns works, and exit non-zero when coredns can't be reached mid-convergence.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bind9-rndc
+data:
+  rndc.key: |
+    # NOT a real secret -- throwaway key for this in-cluster test only.
+    key "rndc-key" {
+        algorithm hmac-sha256;
+        secret "ffffffffffffffffffffffffffffffffffffffffffff";
+    };
+  named.conf.local: |
+    include "/etc/bind/rndc.key";
+    controls {
+        inet 0.0.0.0 port 953 allow { any; } keys { "rndc-key"; };
+    };
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bind9-probe-headless
+  labels:
+    app: bind9-probe
+spec:
+  clusterIP: None  # headless. name = pod IP
+  selector:
+    app: bind9-probe
+  ports:
+  - protocol: TCP
+    port: 53
+    targetPort: 53
+    name: bind9-tcp
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bind9-probe
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bind9-probe
+  template:
+    metadata:
+      labels:
+        app: bind9-probe
+    spec:
+      containers:
+      - name: bind9
+        image: bind9:9.20
+        ports:
+        - containerPort: 53
+          protocol: TCP
+        - containerPort: 53
+          protocol: UDP
+        securityContext:
+          runAsUser: 0
+          allowPrivilegeEscalation: true
+          capabilities:
+            add:
+              - NET_BIND_SERVICE
+              - NET_ADMIN
+          seccompProfile:
+            type: Unconfined
+        volumeMounts:
+        - name: rndc
+          mountPath: /etc/bind/rndc.key
+          subPath: rndc.key
+        - name: rndc
+          mountPath: /etc/bind/named.conf.local
+          subPath: named.conf.local
+      volumes:
+      - name: rndc
+        configMap:
+          name: bind9-rndc
