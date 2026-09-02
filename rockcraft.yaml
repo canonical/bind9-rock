@@ -58,10 +58,3 @@ parts:
         chmod g+rws ${CRAFT_PRIME}/etc/bind
         chmod g+rwx ${CRAFT_PRIME}/var/cache/bind
         chmod g+r ${CRAFT_PRIME}/etc/bind/named.conf*
-
-  deb-security-manifest:
-    plugin: make
-    source: https://github.com/canonical/rocks-security-manifest
-    source-type: git
-    source-branch: main
-    override-prime: gen_manifest
