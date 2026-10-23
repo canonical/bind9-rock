@@ -1,4 +1,4 @@
-project: my-rock-name
+project: bind9:9.20-26.04
 
 backends:
   craft:
