@@ -6,7 +6,7 @@ execute: |
   trap "docker rm -f bind9-rock >/dev/null 2>&1 || true" EXIT
 
   # Start the bind9 container
-  docker run --rm -d --name bind9-rock bind9:9.20-26.04
+  docker run --rm -d --name bind9-rock bind9:devel
 
   # Use the rdnc-confgen utility to generate a rndc key
   docker exec bind9-rock rndc-confgen -a

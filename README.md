@@ -9,4 +9,4 @@ repository.
 
 ## Available versions
 
-* [bind9-9.20 (Ubuntu 26.04)](./bind9/9.20-26.04/rockcraft.yaml)
+* [bind9-9.20 (Ubuntu 26.04)](https://github.com/canonical/bind9-rock/tree/9.20-26.04)

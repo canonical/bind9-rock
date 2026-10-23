@@ -8,7 +8,7 @@ description: |
   recursively resolving domain names to their IP addresses.
 
 base: bare
-build-base: ubuntu@26.04
+build-base: devel
 run-user: _daemon_
 
 platforms:
