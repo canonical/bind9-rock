@@ -8,7 +8,8 @@ description: |
   recursively resolving domain names to their IP addresses.
 
 base: bare
-build-base: ubuntu@26.10
+# TODO: Update once 26.10 is stabilized
+build-base: devel
 run-user: _daemon_
 
 platforms:
@@ -33,13 +34,26 @@ checks:
 parts: 
   bind9:
     plugin: nil
-    stage-packages:
-      - base-files_base
-      - base-files_chisel
-      - base-files_release-info
-      - base-passwd_data
-      - bind9_core
-      - tzdata_zoneinfo
+
+    # TODO: Uncomment once 26.10 is stabilized
+    # stage-packages:
+    #   - base-files_base
+    #   - base-files_chisel
+    #   - base-files_release-info
+    #   - base-passwd_data
+    #   - bind9_core
+    #   - tzdata_zoneinfo
+
+    # TODO: Remove once 26.10 is stabilized
+    override-build: |
+      craftctl default
+      chisel cut --release ubuntu-26.10 --root ${CRAFT_PART_INSTALL} \
+        base-files_base \
+        base-files_release-info \
+        base-passwd_data \
+        bind9_core \
+        tzdata_zoneinfo
+
     override-prime: |
         craftctl default
 
