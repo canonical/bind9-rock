@@ -1,4 +1,4 @@
-project: bind9:devel
+project: bind9:9.20-26.10
 
 backends:
   craft:
@@ -23,10 +23,10 @@ suites:
       sudo apt remove --yes retry
 
       # Load the rock into docker
-      sudo rockcraft.skopeo --insecure-policy copy "oci-archive:$CRAFT_ARTIFACT" docker-daemon:bind9:devel
+      sudo rockcraft.skopeo --insecure-policy copy "oci-archive:$CRAFT_ARTIFACT" docker-daemon:bind9:9.20-26.10
 
     restore: |
-      docker image rm --force bind9:devel
+      docker image rm --force bind9:9.20-26.10
 
   spread/k8s/:
     summary: K8s integration tests

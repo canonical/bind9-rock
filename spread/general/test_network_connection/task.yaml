@@ -12,7 +12,7 @@ execute: |
   docker run --rm -d --name bind9-rock \
     -v "$(pwd)/db.test.local:/etc/bind/db.test.local:ro" \
     -v "$(pwd)/named.conf.options:/etc/bind/named.conf.options:ro" \
-    --network test-network bind9:devel
+    --network test-network bind9:9.20-26.10
 
   # Use the rdnc-confgen utility to generate a rndc key
   docker exec bind9-rock rndc-confgen -a
