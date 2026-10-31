@@ -55,15 +55,16 @@ jobs:
           if-no-files-found: warn
 
   replica:
-    name: replica (docker-network=${{ matrix.docker-network }})
+    name: replica (${{ matrix.setup }})
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        docker-network:
-          - true
-          - false
+        setup:
+          - docker-network # docker snap + the bridge the general suite leaves behind
+          - docker         # docker snap only
+          - bare           # nothing before the k8s steps
           #
     steps:
       - name: Checkout
@@ -72,13 +73,14 @@ jobs:
           persist-credentials: false
 
       - name: Replay the general suite docker setup
+        if: matrix.setup != 'bare'
         run: |
           set -x
           sudo snap install docker
           for _ in $(seq 10); do sudo docker images && break; sleep 2; done
 
       - name: Create the docker network the general suite leaves behind
-        if: matrix.docker-network == true
+        if: matrix.setup == 'docker-network'
         run: |
           set -x
           sudo docker network create test-network
@@ -90,7 +92,7 @@ jobs:
       - name: Replay the k8s suite prepare
         run: |
           set -x
-          sudo snap remove docker
+          sudo snap remove docker || true
           sudo systemctl stop containerd || true
           sudo rm -rf /run/containerd /var/lib/containerd /etc/containerd || true
 
@@ -112,6 +114,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: k8s-debug-replica-docker-network-${{ matrix.docker-network }}
+          name: k8s-debug-replica-${{ matrix.setup }}
           path: ${{ env.DEBUG_DIR }}
           if-no-files-found: warn
