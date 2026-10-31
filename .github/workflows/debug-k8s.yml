@@ -9,6 +9,10 @@ name: Debug k8s tests
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - k8s-debug
+      #
 
 permissions:
   contents: read
