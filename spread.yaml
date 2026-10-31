@@ -64,6 +64,13 @@ suites:
       /snap/k8s/current/bin/ctr --address /run/containerd/containerd.sock -n k8s.io \
         images import --base-name docker.io/library/bind9 $CRAFT_ARTIFACT
 
+    # Runs when prepare fails; debug-each when a task fails. The dump lands on
+    # the test host, so a workflow step can upload it as an artefact.
+    debug: |
+      "$PROJECT_PATH"/spread/k8s/debug.sh /tmp/k8s-debug
+    debug-each: |
+      "$PROJECT_PATH"/spread/k8s/debug.sh /tmp/k8s-debug
+
 exclude:
   - .git
 

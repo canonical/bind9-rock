@@ -1,0 +1,113 @@
+name: Debug k8s tests
+
+# Diagnoses the spread k8s suite failing on hosted amd64 runners. Two angles:
+# - pipeline: the real `rockcraft test`, as the rock pipeline runs it, with the
+#   k8s suite debug hook dumping cluster state on failure.
+# - replica: the k8s suite prepare steps replayed in plain bash, with and
+#   without the docker network the general suite leaves behind.
+# Both upload the dump as a workflow artefact.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DEBUG_DIR: /tmp/k8s-debug
+
+jobs:
+  pipeline:
+    name: rockcraft test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Pack and test
+        uses: canonical/craft-actions/rockcraft/pack@acd2f2e61c7563b38ba89390ca0e910fa7d2784f # v0.1.1
+        with:
+          test: "true"
+          verbosity: debug
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          if [ ! -d "${DEBUG_DIR}" ]; then
+            echo "no dump at ${DEBUG_DIR}: the debug hook did not run"
+            exit 0
+          fi
+          sudo chmod -R a+rX "${DEBUG_DIR}"
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: k8s-debug-pipeline
+          path: ${{ env.DEBUG_DIR }}
+          if-no-files-found: warn
+
+  replica:
+    name: replica (docker-network=${{ matrix.docker-network }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        docker-network:
+          - true
+          - false
+          #
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Replay the general suite docker setup
+        run: |
+          set -x
+          sudo snap install docker
+          for _ in $(seq 10); do sudo docker images && break; sleep 2; done
+
+      - name: Create the docker network the general suite leaves behind
+        if: matrix.docker-network == true
+        run: |
+          set -x
+          sudo docker network create test-network
+          sudo docker run --rm -d --name probe --network test-network ubuntu:24.04 sleep infinity
+          sudo docker rm -f probe
+          sudo docker network ls
+          ip -details link
+
+      - name: Replay the k8s suite prepare
+        run: |
+          set -x
+          sudo snap remove docker
+          sudo systemctl stop containerd || true
+          sudo rm -rf /run/containerd /var/lib/containerd /etc/containerd || true
+
+          sudo snap install k8s --classic
+
+          sudo k8s bootstrap
+          sudo k8s status --wait-ready --timeout 15m
+
+          timeout 300 bash -c 'until [ -n "$(sudo k8s kubectl get pods --namespace kube-system --no-headers 2>/dev/null)" ]; do sleep 2; done'
+          sudo k8s kubectl wait --for=condition=Ready pods --all --namespace kube-system --timeout=5m
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          sudo spread/k8s/debug.sh "${DEBUG_DIR}"
+          sudo chmod -R a+rX "${DEBUG_DIR}"
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: k8s-debug-replica-docker-network-${{ matrix.docker-network }}
+          path: ${{ env.DEBUG_DIR }}
+          if-no-files-found: warn
