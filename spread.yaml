@@ -52,6 +52,9 @@ suites:
       k8s bootstrap
       k8s status --wait-ready --timeout 15m
 
+      # `kubectl wait` errors out with "no matching resources found" if no pods
+      # exist yet, so first wait for the kube-system pods to be created.
+      timeout 300 bash -c 'until [ -n "$(k8s kubectl get pods --namespace kube-system --no-headers 2>/dev/null)" ]; do sleep 2; done'
       # status --wait-ready returns before kube-system settles, and k8sd re-rolls
       # cilium right after bootstrap, so a one-shot `kubectl wait pods --all` can
       # time out on a pod that got replaced. retry until one full pass succeeds.
