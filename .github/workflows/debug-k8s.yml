@@ -99,8 +99,13 @@ jobs:
           sudo k8s bootstrap
           sudo k8s status --wait-ready --timeout 15m
 
-          timeout 300 bash -c 'until [ -n "$(sudo k8s kubectl get pods --namespace kube-system --no-headers 2>/dev/null)" ]; do sleep 2; done'
-          sudo k8s kubectl wait --for=condition=Ready pods --all --namespace kube-system --timeout=5m
+          for obj in daemonset/cilium deployment/cilium-operator deployment/coredns \
+                     deployment/metrics-server daemonset/ck-storage-rawfile-csi-node \
+                     statefulset/ck-storage-rawfile-csi-controller; do
+            timeout 300 bash -c "until sudo k8s kubectl get --namespace kube-system $obj >/dev/null 2>&1; do sleep 2; done"
+            sudo k8s kubectl rollout status --namespace kube-system "$obj" --timeout=5m
+          done
+          sudo k8s kubectl get pods --namespace kube-system
 
       - name: Collect diagnostics
         if: always()
